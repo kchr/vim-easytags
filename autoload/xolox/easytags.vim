@@ -51,9 +51,45 @@ function! xolox#easytags#autoload(event) " {{{2
         if xolox#misc#option#get('easytags_updatetime_autodisable', exists('g:loaded_neocomplcache'))
           return
         else
-          call xolox#misc#msg#warn("easytags.vim %s: I'm being executed every %i milliseconds! Please :set updatetime=%i. To find where 'updatetime' was changed execute ':verb set ut?'", g:xolox#easytags#version, &updatetime, updatetime_min)
+
+          " Automatically adjust our update time? 
+          if xolox#misc#option#get('easytags_updatetime_autoadjust', 0)
+
+            " Is this the first time we have to skip update?
+            if !exists('b:easytags_updatetime_skip')
+              let b:easytags_updatetime_skipped = 0
+              try
+                let b:easytags_updatetime_skip = updatetime_min / &updatetime
+              catch
+                call xolox#misc#msg#warn('easytags.vim: Could not calc skip')
+                let b:easytags_updatetime_skip = 5
+              endtry
+            endif
+
+            " Have we waited enough times?
+            if b:easytags_updatetime_skipped < b:easytags_updatetime_skip
+              let b:easytags_updatetime_skipped += 1
+              if xolox#misc#option#get('easytags_updatetime_autoadjust_warning', 1)
+                call xolox#misc#msg#warn("easytags.vim %s: [%s] Delaying update to better match easytags_updatetime_min (%i) [#%i/%i] (Set easytags_updatetime_autoadjust_warning=0 to hide this message)", g:xolox#easytags#version, expand('%'), &updatetime, b:easytags_updatetime_skipped, b:easytags_updatetime_skip)
+              endif
+              return
+            endif
+          else
+
+            call xolox#misc#msg#warn("easytags.vim %s: I'm being executed every %i milliseconds! Please :set updatetime=%i. To find where 'updatetime' was changed execute ':verb set ut?'", g:xolox#easytags#version, &updatetime, updatetime_min)
+
+          endif
+
         endif
       endif
+    endif
+    if exists('b:easytags_updatetime_skip')
+      if xolox#misc#option#get('easytags_updatetime_autoadjust_warning', 1)
+        call xolox#misc#msg#warn("easytags.vim %s: [%s] Done waiting to match VIM updatetime. Will update for real", g:xolox#easytags#version, expand('%'))
+      endif
+      " Reset counters, we're done waiting for now
+      unlet b:easytags_updatetime_skipped
+      unlet b:easytags_updatetime_skip
     endif
     let do_update = xolox#misc#option#get('easytags_auto_update', 1)
     let do_highlight = xolox#misc#option#get('easytags_auto_highlight', 1) && &eventignore !~? '\<syntax\>'
